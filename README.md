@@ -392,97 +392,113 @@ Go deeper still. On that table sits a `Chessboard` with its own configs — `Che
 
 You are not managing one flat list of world positions. You are building a tree of composable states where each node in the hierarchy can independently switch between multiple captured arrangements. This scales to any depth: a city block containing buildings, buildings containing rooms, rooms containing furniture, furniture containing objects. Each level manages only its own immediate children — configs stay small, focused, and reusable across any instance of that parent anywhere in the scene.
 
----
-
 ## Runtime API
-
-All runtime classes live in the `TransformSnapshotTool` namespace and have **no UnityEditor dependencies** — they are fully safe in builds.
-
+ 
+The runtime classes have **no UnityEditor dependencies** and are fully safe in builds.
+ 
+There are two layers:
+ 
+- **Core API** — the static classes `RuntimeCaptureApplier`, `RuntimeCaptureWriter`, and the `RuntimeApplyOptions` data class. These live in the `TransformSnapshotTool` namespace and are the reusable, general-purpose runtime API. Use these in your own scripts.
+- **Example components** — `RuntimeApplyExample` and `RuntimeCaptureExample` are ready-made MonoBehaviours that demonstrate the core API. They are fully functional and can be used directly or copied as a starting point. `RuntimeCaptureExample` lives in the `TransformSnapshotTool.Example` namespace and contains demo-specific fields (ragdoll, furniture).
 ---
-
-### SimpleRuntimeApplier
-
-A lightweight MonoBehaviour for applying editor-captured configs by name at runtime. Assign the `SceneConfigLibrary` asset in the Inspector, then call `Apply` from any script, button, or UnityEvent.
-
+ 
+### RuntimeApplyExample
+ 
+An example MonoBehaviour for applying editor-captured configs by name at runtime. Assign the `SceneConfigLibrary` asset in the Inspector, then call `Apply` from any script, button, or UnityEvent. It can also trigger configs from keyboard shortcuts.
+ 
 **Inspector fields:**
-
+ 
 | Field | Description |
 |---|---|
 | Scene Config Library | The `SceneConfigLibrary` asset for this scene (drag from Project window) |
-
-**API:**
-
+| Configs | Array of `KeyedCaptureEntry` items — each pairs a config with a keyboard shortcut and a per-key Snap/Lerp transition. Right-click a config card in the tool window and choose **Feed Config** to populate an entry. |
+ 
+**Apply API:**
+ 
+Every `Apply` overload accepts an optional `lerp` argument. Pass `lerp: true` to interpolate smoothly using the entry's duration and easing curve; omit it (or pass `false`) to snap instantly.
+ 
 ```csharp
-// Apply using settings stored on the config in the editor tool
+// Snap using the settings stored on the config
 _applier.Apply("Idle");
-
-// Apply with an explicit space mode, respecting the config's component toggles
+ 
+// Lerp using the entry's inspector duration + easing curve
+_applier.Apply("Idle", lerp: true);
+ 
+// Explicit space mode (snap)
 _applier.Apply("Idle", RuntimeApplyMode.LocalSpace);
-
-// Apply with inline component toggles, respecting the config's stored mode
+ 
+// Explicit space mode (lerp)
+_applier.Apply("Idle", RuntimeApplyMode.LocalSpace, lerp: true);
+ 
+// Inline component toggles (snap)
 _applier.Apply("Idle", position: true, rotation: true, scale: false);
-
-// Apply with explicit mode and component toggles (full override)
+ 
+// Inline component toggles (lerp)
+_applier.Apply("Idle", position: true, rotation: true, scale: false, lerp: true);
+ 
+// Explicit mode and component toggles — full override, always snaps
 _applier.Apply("Idle", RuntimeApplyMode.WorldSpace, true, false, true);
-
-// Apply with fully custom options
-_applier.Apply("Idle", new RuntimeApplyOptions
-{
-    mode          = RuntimeApplyMode.LocalSpace,
-    applyPosition = true,
-    applyRotation = false,
-    applyScale    = true,
-});
+ 
+// Cancel any lerp currently running on this component
+_applier.StopLerp();
 ```
-
+ 
 **Overload summary:**
-
-| Overload | Mode | Components |
-|---|---|---|
-| `Apply(name)` | from asset | from asset |
-| `Apply(name, mode)` | caller picks | from asset |
-| `Apply(name, pos, rot, scl)` | from asset | caller picks |
-| `Apply(name, mode, pos, rot, scl)` | caller picks | caller picks |
-| `Apply(name, options)` | full manual | full manual |
-
-> `SimpleRuntimeApplier` is for editor-captured configs only. For runtime captures (snapshots taken during gameplay), use `RuntimeCapturer` instead.
-
+ 
+| Overload | Mode | Components | Lerp |
+|---|---|---|---|
+| `Apply(name, lerp = false)` | from asset/entry | from asset/entry | optional |
+| `Apply(name, mode, lerp = false)` | caller picks | from asset/entry | optional |
+| `Apply(name, pos, rot, scl, lerp = false)` | from asset/entry | caller picks | optional |
+| `Apply(name, mode, pos, rot, scl)` | caller picks | caller picks | always snaps |
+ 
+**Other members:**
+ 
+| Member | Description |
+|---|---|
+| `StopLerp()` | Cancels any lerp currently running on this component. |
+| `IsLerping` | `bool` property — `true` while a lerp is in progress. |
+ 
+> `RuntimeApplyExample` applies configs created in the editor tool and stored in a `SceneConfigLibrary`. For capturing snapshots during gameplay, use `RuntimeCaptureWriter` (or the `RuntimeCaptureExample` component).
+ 
 ---
-
-### RuntimeCapturer
-
-A MonoBehaviour for capturing and restoring transform snapshots at runtime. Snapshots live in memory and can optionally be persisted to JSON in `Application.persistentDataPath`. No editor dependencies — safe in builds.
-
+ 
+### RuntimeCaptureExample
+ 
+An example MonoBehaviour demonstrating runtime capture, apply, and JSON persistence. Snapshots live in memory and can optionally be persisted to JSON in `Application.persistentDataPath`. Namespace: `TransformSnapshotTool.Example`.
+ 
+This component includes demo-specific fields (a ragdoll-recovery example and a furniture-placer example) to show realistic usage. For your own projects, you can use it directly, copy the parts you need, or call the core `RuntimeCaptureWriter` / `RuntimeCaptureApplier` API instead.
+ 
 **Inspector fields:**
-
+ 
 | Field | Description |
 |---|---|
-| Ragdoll Bones | All bone GameObjects that make up the ragdoll hierarchy |
-| Furniture | All furniture GameObjects the player can move |
-
+| Ragdoll Bones | *(demo)* Bone GameObjects used by the ragdoll-recovery example |
+| Furniture | *(demo)* Furniture GameObjects used by the furniture-placer example |
+ 
 **Capture API:**
-
+ 
 ```csharp
 // Snapshot specific objects to memory (no disk write)
 capturer.Capture("MyPose", objA, objB, objC);
 capturer.Capture("MyPose", myGameObjectArray);
 ```
-
+ 
 **Apply API:**
-
+ 
 ```csharp
 // Restore with default options
 capturer.Apply("MyPose");
-
+ 
 // Restore with explicit space mode
 capturer.Apply("MyPose", RuntimeApplyMode.LocalSpace);
-
+ 
 // Restore with inline component toggles
 capturer.Apply("MyPose", position: true, rotation: false, scale: false);
-
+ 
 // Restore with explicit mode and component toggles
 capturer.Apply("MyPose", RuntimeApplyMode.LocalSpace, false, true, false);
-
+ 
 // Restore with fully custom options
 capturer.Apply("MyPose", new RuntimeApplyOptions
 {
@@ -492,39 +508,39 @@ capturer.Apply("MyPose", new RuntimeApplyOptions
     applyScale    = false,
 });
 ```
-
+ 
 **Persistence API:**
-
+ 
 ```csharp
 // Write a memory snapshot to JSON
 capturer.Save("MyPose");
-
+ 
 // Load a JSON snapshot into memory (does not apply it)
 capturer.Load("MyPose");
-
+ 
 // Load from JSON and apply immediately
 capturer.LoadAndApply("MyPose");
-
+ 
 // Delete a JSON file from disk
 capturer.Delete("MyPose");
-
+ 
 // Query
 bool inMemory = capturer.HasSnapshot("MyPose");
 bool onDisk   = capturer.HasSave("MyPose");
 ```
-
-> Snapshots are temporary by default — `Capture` stores to memory only. Call `Save` explicitly to persist to disk. `RuntimeCapturer` and `SimpleRuntimeApplier` use separate storage — naming conflicts between them are impossible.
-
+ 
+> Snapshots are temporary by default — `Capture` stores to memory only. Call `Save` explicitly to persist to disk.
+ 
 ---
-
+ 
 ### RuntimeCaptureApplier
-
-Instantly applies a `CaptureConfiguration` to live scene objects. Resolves GameObjects by stored hierarchy path, with a name-fallback scoring strategy if the path walk fails. Called internally by `SimpleRuntimeApplier` and `RuntimeCapturer`.
-
+ 
+Static class. Instantly applies a `CaptureConfiguration` to live scene objects. Resolves GameObjects by stored hierarchy path, with a name-fallback scoring strategy if the path walk fails. This is the core apply API — used internally by the example components.
+ 
 ```csharp
-// Apply all objects in a config
+// Apply all objects in a config (options is optional; null uses Default)
 RuntimeCaptureApplier.ApplyConfiguration(config);
-
+ 
 // Apply with custom options
 RuntimeCaptureApplier.ApplyConfiguration(config, new RuntimeApplyOptions
 {
@@ -533,19 +549,19 @@ RuntimeCaptureApplier.ApplyConfiguration(config, new RuntimeApplyOptions
     applyRotation = false,
     applyScale    = false,
 });
-
+ 
 // Apply only objects under a specific subtree
 RuntimeCaptureApplier.ApplyToSubtree(config, rootTransform);
 ```
-
-**Returns:** `int` — number of objects successfully updated.
-
+ 
+Both methods return `int` — the number of objects successfully updated.
+ 
 ---
-
+ 
 ### RuntimeApplyOptions
-
-Controls coordinate space and which transform components are applied.
-
+ 
+Data class controlling coordinate space and which transform components are applied.
+ 
 ```csharp
 // Built-in presets
 RuntimeApplyOptions.Default             // Auto mode, all components on
@@ -555,7 +571,7 @@ RuntimeApplyOptions.ScaleOnly           // scale only
 RuntimeApplyOptions.PositionAndRotation // position + rotation, no scale
 RuntimeApplyOptions.WorldSpace          // world space, all components
 RuntimeApplyOptions.LocalSpace          // local space, all components
-
+ 
 // Custom
 var options = new RuntimeApplyOptions
 {
@@ -566,58 +582,65 @@ var options = new RuntimeApplyOptions
     includeObjectPaths = new[] { "Root/Arm/Hand" } // whitelist; null = apply all
 };
 ```
-
+ 
 **RuntimeApplyMode values:**
-
+ 
 | Value | Behaviour |
 |---|---|
 | `Auto` | Root objects use world space, children use local space *(recommended)* |
 | `WorldSpace` | Always apply world position, rotation, and lossy scale |
 | `LocalSpace` | Always apply local position, rotation, and local scale |
-
+ 
 ---
-
+ 
 ### RuntimeCaptureWriter
-
-Low-level static class for capturing live transforms and persisting them as JSON. Used internally by `RuntimeCapturer`. Use `RuntimeCapturer` for most cases — use this directly only when you need the raw `CaptureConfiguration` object.
-
+ 
+Static class for capturing live transforms and persisting them as JSON. This is the core capture + persistence API.
+ 
 **Save location:**
 ```
 Application.persistentDataPath/TransformSnapshotTool/{configName}.json
-
+ 
 Windows : %AppData%\..\LocalLow\<Company>\<Product>\TransformSnapshotTool\
 macOS   : ~/Library/Application Support/<Company>/<Product>/TransformSnapshotTool/
 Android : /data/data/<packagename>/files/TransformSnapshotTool/
 iOS     : <AppHome>/Documents/TransformSnapshotTool/
 ```
-
+ 
 ```csharp
 // Capture objects to memory (no disk write)
 CaptureConfiguration capture = RuntimeCaptureWriter.Capture("MyPose", objectArray);
-
+ 
 // Capture and immediately save to JSON
 RuntimeCaptureWriter.CaptureAndSave("MyPose", objectArray);
-
+ 
 // Save an in-memory config to JSON
 RuntimeCaptureWriter.Save(capture);
-
+ 
 // Load a config from JSON by name
 CaptureConfiguration loaded = RuntimeCaptureWriter.Load("MyPose");
-
-// Apply the loaded config
+ 
+// Load every saved JSON config from disk
+List<CaptureConfiguration> all = RuntimeCaptureWriter.LoadAll();
+ 
+// Apply a loaded config
 RuntimeCaptureApplier.ApplyConfiguration(loaded);
-
+ 
 // Query
 bool         exists = RuntimeCaptureWriter.Exists("MyPose");
 List<string> names  = RuntimeCaptureWriter.GetSavedConfigNames();
-
+ 
 // Delete
 RuntimeCaptureWriter.Delete("MyPose");
 ```
-
+ 
+**`MaxSavedConfigs`** — optional static field. When set above `0`, the oldest JSON files are deleted automatically once the saved count exceeds the limit. Defaults to `0` (no limit).
+ 
+```csharp
+RuntimeCaptureWriter.MaxSavedConfigs = 20; // keep only the 20 most recent
+```
+ 
 > In the Editor, JSON files survive Play Mode exit, making them useful for iterating on runtime-captured poses between sessions.
-
----
 
 ## Data Storage
 
