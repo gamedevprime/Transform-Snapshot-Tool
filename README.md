@@ -31,11 +31,6 @@ A Unity Editor tool for capturing, managing, and restoring transform configurati
 - [Real World Use Cases](#real-world-use-cases)
 - [The Power of Config Stacking](#the-power-of-config-stacking)
 - [Runtime API](#runtime-api)
-  - [SimpleRuntimeApplier](#simpleruntimeapplier)
-  - [RuntimeCapturer](#runtimecapturer)
-  - [RuntimeCaptureApplier](#runtimecaptureapplier)
-  - [RuntimeApplyOptions](#runtimeapplyoptions)
-  - [RuntimeCaptureWriter](#runtimecapturewriter)
 - [Data Storage](#data-storage)
 - [FAQ](#faq)
 
