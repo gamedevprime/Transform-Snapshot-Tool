@@ -1,9 +1,9 @@
 # TransformSnapshot Tool
- ***Tool Version — v1.0.0***
+ ***Tool Version — v1.0.1***
 
 
-A Unity Editor tool for capturing, managing, and restoring transform configurations in your scenes. Works in Edit Mode, Play Mode and Runtime.
- 
+A Unity Editor tool for capturing, managing, and restoring transform configurations in your scenes. Runs in the Unity Editor — Edit Mode and Play Mode preview. It never adds components to your objects and ships nothing into your build.
+
 
 ---
 
@@ -21,7 +21,6 @@ A Unity Editor tool for capturing, managing, and restoring transform configurati
 - [Managing Configurations](#managing-configurations)
 - [Filtering and Search](#filtering-and-search)
 - [Multi-Select / Bulk Actions](#multi-select--bulk-actions)
-- [Sending a Config to a Script](#sending-a-config-to-a-script)
 - [Cross-Scene Config Import](#cross-scene-config-import)
 - [Pasting Transforms Between Configs](#pasting-transforms-between-configs)
 - [Resolution Dialog](#resolution-dialog)
@@ -30,7 +29,6 @@ A Unity Editor tool for capturing, managing, and restoring transform configurati
 - [Maintenance](#maintenance)
 - [Real World Use Cases](#real-world-use-cases)
 - [The Power of Config Stacking](#the-power-of-config-stacking)
-- [Runtime API](#runtime-api)
 - [Data Storage](#data-storage)
 - [FAQ](#faq)
 
@@ -40,7 +38,9 @@ A Unity Editor tool for capturing, managing, and restoring transform configurati
 
 1. Import the package into your Unity project via the Package Manager or by placing the folder inside `Assets/`.
 2. No additional setup needed — the tool activates automatically once imported.
-3. Launch it from Tools / TransformSnapshot / Main Window
+3. Launch it from **Tools > Transform Snapshot > Main Window**. A visual **Getting Started** page is also available at **Tools > Transform Snapshot > Getting Started**.
+
+> **Compatibility:** Unity 6 and newer. Works with Built-in, URP, and HDRP — the tool is pipeline-agnostic (it only reads and writes Transforms).
 
 ---
 ## Quick Start
@@ -94,7 +94,7 @@ Choose what gets included in the Capture dialog:
 
 ### The Config List
 
-Each configuration appears as a card showing the config name, transform count (roots = top-most captured parents, children = total children of all roots), and a status colour:
+Each configuration appears as a card showing the config name, the number of transforms captured, and a status colour:
 
 - **Grey** — all transforms valid
 - **Yellow** — some transforms missing
@@ -123,7 +123,7 @@ Each configuration has an independent apply mode:
 | **Auto** *(recommended)* | Root objects use world space; children use local space. Handles mixed hierarchies correctly out of the box. |
 | **World Space** | Objects are placed at their exact captured world positions. Best for room layouts and absolute prop placement. |
 | **Local Space** | Transforms are applied relative to the current parent. Best for character poses and reusable setups. |
-| **Selected Only** | Editor only — applies only to objects currently selected in the scene. Best for partial updates. |
+| **Selected Only** | Applies only to objects currently selected in the scene. Best for partial updates. |
 
 ---
 
@@ -186,10 +186,11 @@ Categories are coloured header bars that group configs visually.
 | Move to Category | Move to a different category |
 | Remove Orphaned Transforms | Delete entries for deleted objects |
 | Add to Export Queue | Queue for cross-scene import |
+| Copy Transforms | Copy this config's pose data to the clipboard |
 | Paste Transforms | Paste pose data from another config onto this config's objects |
 | Delete | Permanently delete the config |
 
-**Clicking the info line** (e.g. *2 transforms — 2 roots, 0 children*) selects all captured objects in the scene and frames them in the Scene View.
+**Clicking the info line** (e.g. *2 transforms*) selects all captured objects in the scene and frames them in the Scene View.
 
 > Never rename or move config asset files manually — always use the tool's Rename action to keep internal references intact.
 
@@ -238,7 +239,7 @@ Every transform is stored using Unity's `GlobalObjectId` — an identifier tied 
 3. **Bulk Actions → Export : Add Selected to Queue**.
 4. A red badge on the Options button shows the number of queued configs.
 
-> Alternatively, right-click any config card → **Export : Add to Queue**.
+> Alternatively, right-click any config card → **Add to Export Queue**.
 
 ### Importing (destination scene)
 
@@ -255,10 +256,10 @@ The more your scenes share a common hierarchy structure, the faster the import r
 ## Pasting Transforms Between Configs
 
 The Paste Transforms workflow copies the pose data from one config onto the live objects tracked by another config — without requiring the two configs to have identically named objects.
-1. Right-click any config card and click **Copy Transforms**.
-1. Right-click any other config card and click **Paste Transforms**.
 
-3. The **Resolution Dialog** opens up to map source entries to target objects.
+1. Right-click any config card and click **Copy Transforms**.
+2. Right-click any other config card and click **Paste Transforms**.
+3. The **Resolution Dialog** opens to map source entries to target objects.
 4. Click **Paste** to apply. The target config's stored pose is updated with the pasted values so re-applying it later uses the new pose.
 
 ---
@@ -310,7 +311,7 @@ Delete all capture data for this scene too?
 ```
 
 Choose **Yes, delete all** or **Keep capture data**.
-Keep Capture data options is there for the recovery of accidental scene deletion.
+The Keep capture data option is there to recover from accidental scene deletion.
 
 ---
 
@@ -387,255 +388,7 @@ Go deeper still. On that table sits a `Chessboard` with its own configs — `Che
 
 You are not managing one flat list of world positions. You are building a tree of composable states where each node in the hierarchy can independently switch between multiple captured arrangements. This scales to any depth: a city block containing buildings, buildings containing rooms, rooms containing furniture, furniture containing objects. Each level manages only its own immediate children — configs stay small, focused, and reusable across any instance of that parent anywhere in the scene.
 
-## Runtime API
- 
-The runtime classes have **no UnityEditor dependencies** and are fully safe in builds.
- 
-There are two layers:
- 
-- **Core API** — the static classes `RuntimeCaptureApplier`, `RuntimeCaptureWriter`, and the `RuntimeApplyOptions` data class. These live in the `TransformSnapshotTool` namespace and are the reusable, general-purpose runtime API. Use these in your own scripts.
-- **Example components** — `RuntimeApplyExample` and `RuntimeCaptureExample` are ready-made MonoBehaviours that demonstrate the core API. They are fully functional and can be used directly or copied as a starting point. `RuntimeCaptureExample` lives in the `TransformSnapshotTool.Example` namespace and contains demo-specific fields (ragdoll, furniture).
 ---
- 
-### RuntimeApplyExample
- 
-An example MonoBehaviour for applying editor-captured configs by name at runtime. Assign the `SceneConfigLibrary` asset in the Inspector, then call `Apply` from any script, button, or UnityEvent. It can also trigger configs from keyboard shortcuts.
- 
-**Inspector fields:**
- 
-| Field | Description |
-|---|---|
-| Scene Config Library | The `SceneConfigLibrary` asset for this scene (drag from Project window) |
-| Configs | Array of `KeyedCaptureEntry` items — each pairs a config with a keyboard shortcut and a per-key Snap/Lerp transition. Right-click a config card in the tool window and choose **Feed Config** to populate an entry. |
- 
-**Apply API:**
- 
-Every `Apply` overload accepts an optional `lerp` argument. Pass `lerp: true` to interpolate smoothly using the entry's duration and easing curve; omit it (or pass `false`) to snap instantly.
- 
-```csharp
-// Snap using the settings stored on the config
-_applier.Apply("Idle");
- 
-// Lerp using the entry's inspector duration + easing curve
-_applier.Apply("Idle", lerp: true);
- 
-// Explicit space mode (snap)
-_applier.Apply("Idle", RuntimeApplyMode.LocalSpace);
- 
-// Explicit space mode (lerp)
-_applier.Apply("Idle", RuntimeApplyMode.LocalSpace, lerp: true);
- 
-// Inline component toggles (snap)
-_applier.Apply("Idle", position: true, rotation: true, scale: false);
- 
-// Inline component toggles (lerp)
-_applier.Apply("Idle", position: true, rotation: true, scale: false, lerp: true);
- 
-// Explicit mode and component toggles — full override, always snaps
-_applier.Apply("Idle", RuntimeApplyMode.WorldSpace, true, false, true);
- 
-// Cancel any lerp currently running on this component
-_applier.StopLerp();
-```
- 
-**Overload summary:**
- 
-| Overload | Mode | Components | Lerp |
-|---|---|---|---|
-| `Apply(name, lerp = false)` | from asset/entry | from asset/entry | optional |
-| `Apply(name, mode, lerp = false)` | caller picks | from asset/entry | optional |
-| `Apply(name, pos, rot, scl, lerp = false)` | from asset/entry | caller picks | optional |
-| `Apply(name, mode, pos, rot, scl)` | caller picks | caller picks | always snaps |
- 
-**Other members:**
- 
-| Member | Description |
-|---|---|
-| `StopLerp()` | Cancels any lerp currently running on this component. |
-| `IsLerping` | `bool` property — `true` while a lerp is in progress. |
- 
-> `RuntimeApplyExample` applies configs created in the editor tool and stored in a `SceneConfigLibrary`. For capturing snapshots during gameplay, use `RuntimeCaptureWriter` (or the `RuntimeCaptureExample` component).
- 
----
- 
-### RuntimeCaptureExample
- 
-An example MonoBehaviour demonstrating runtime capture, apply, and JSON persistence. Snapshots live in memory and can optionally be persisted to JSON in `Application.persistentDataPath`. Namespace: `TransformSnapshotTool.Example`.
- 
-This component includes demo-specific fields (a ragdoll-recovery example and a furniture-placer example) to show realistic usage. For your own projects, you can use it directly, copy the parts you need, or call the core `RuntimeCaptureWriter` / `RuntimeCaptureApplier` API instead.
- 
-**Inspector fields:**
- 
-| Field | Description |
-|---|---|
-| Ragdoll Bones | *(demo)* Bone GameObjects used by the ragdoll-recovery example |
-| Furniture | *(demo)* Furniture GameObjects used by the furniture-placer example |
- 
-**Capture API:**
- 
-```csharp
-// Snapshot specific objects to memory (no disk write)
-capturer.Capture("MyPose", objA, objB, objC);
-capturer.Capture("MyPose", myGameObjectArray);
-```
- 
-**Apply API:**
- 
-```csharp
-// Restore with default options
-capturer.Apply("MyPose");
- 
-// Restore with explicit space mode
-capturer.Apply("MyPose", RuntimeApplyMode.LocalSpace);
- 
-// Restore with inline component toggles
-capturer.Apply("MyPose", position: true, rotation: false, scale: false);
- 
-// Restore with explicit mode and component toggles
-capturer.Apply("MyPose", RuntimeApplyMode.LocalSpace, false, true, false);
- 
-// Restore with fully custom options
-capturer.Apply("MyPose", new RuntimeApplyOptions
-{
-    mode          = RuntimeApplyMode.LocalSpace,
-    applyPosition = false,
-    applyRotation = true,
-    applyScale    = false,
-});
-```
- 
-**Persistence API:**
- 
-```csharp
-// Write a memory snapshot to JSON
-capturer.Save("MyPose");
- 
-// Load a JSON snapshot into memory (does not apply it)
-capturer.Load("MyPose");
- 
-// Load from JSON and apply immediately
-capturer.LoadAndApply("MyPose");
- 
-// Delete a JSON file from disk
-capturer.Delete("MyPose");
- 
-// Query
-bool inMemory = capturer.HasSnapshot("MyPose");
-bool onDisk   = capturer.HasSave("MyPose");
-```
- 
-> Snapshots are temporary by default — `Capture` stores to memory only. Call `Save` explicitly to persist to disk.
- 
----
- 
-### RuntimeCaptureApplier
- 
-Static class. Instantly applies a `CaptureConfiguration` to live scene objects. Resolves GameObjects by stored hierarchy path, with a name-fallback scoring strategy if the path walk fails. This is the core apply API — used internally by the example components.
- 
-```csharp
-// Apply all objects in a config (options is optional; null uses Default)
-RuntimeCaptureApplier.ApplyConfiguration(config);
- 
-// Apply with custom options
-RuntimeCaptureApplier.ApplyConfiguration(config, new RuntimeApplyOptions
-{
-    mode          = RuntimeApplyMode.WorldSpace,
-    applyPosition = true,
-    applyRotation = false,
-    applyScale    = false,
-});
- 
-// Apply only objects under a specific subtree
-RuntimeCaptureApplier.ApplyToSubtree(config, rootTransform);
-```
- 
-Both methods return `int` — the number of objects successfully updated.
- 
----
- 
-### RuntimeApplyOptions
- 
-Data class controlling coordinate space and which transform components are applied.
- 
-```csharp
-// Built-in presets
-RuntimeApplyOptions.Default             // Auto mode, all components on
-RuntimeApplyOptions.PositionOnly        // position only
-RuntimeApplyOptions.RotationOnly        // rotation only
-RuntimeApplyOptions.ScaleOnly           // scale only
-RuntimeApplyOptions.PositionAndRotation // position + rotation, no scale
-RuntimeApplyOptions.WorldSpace          // world space, all components
-RuntimeApplyOptions.LocalSpace          // local space, all components
- 
-// Custom
-var options = new RuntimeApplyOptions
-{
-    mode               = RuntimeApplyMode.Auto,
-    applyPosition      = true,
-    applyRotation      = true,
-    applyScale         = false,
-    includeObjectPaths = new[] { "Root/Arm/Hand" } // whitelist; null = apply all
-};
-```
- 
-**RuntimeApplyMode values:**
- 
-| Value | Behaviour |
-|---|---|
-| `Auto` | Root objects use world space, children use local space *(recommended)* |
-| `WorldSpace` | Always apply world position, rotation, and lossy scale |
-| `LocalSpace` | Always apply local position, rotation, and local scale |
- 
----
- 
-### RuntimeCaptureWriter
- 
-Static class for capturing live transforms and persisting them as JSON. This is the core capture + persistence API.
- 
-**Save location:**
-```
-Application.persistentDataPath/TransformSnapshotTool/{configName}.json
- 
-Windows : %AppData%\..\LocalLow\<Company>\<Product>\TransformSnapshotTool\
-macOS   : ~/Library/Application Support/<Company>/<Product>/TransformSnapshotTool/
-Android : /data/data/<packagename>/files/TransformSnapshotTool/
-iOS     : <AppHome>/Documents/TransformSnapshotTool/
-```
- 
-```csharp
-// Capture objects to memory (no disk write)
-CaptureConfiguration capture = RuntimeCaptureWriter.Capture("MyPose", objectArray);
- 
-// Capture and immediately save to JSON
-RuntimeCaptureWriter.CaptureAndSave("MyPose", objectArray);
- 
-// Save an in-memory config to JSON
-RuntimeCaptureWriter.Save(capture);
- 
-// Load a config from JSON by name
-CaptureConfiguration loaded = RuntimeCaptureWriter.Load("MyPose");
- 
-// Load every saved JSON config from disk
-List<CaptureConfiguration> all = RuntimeCaptureWriter.LoadAll();
- 
-// Apply a loaded config
-RuntimeCaptureApplier.ApplyConfiguration(loaded);
- 
-// Query
-bool         exists = RuntimeCaptureWriter.Exists("MyPose");
-List<string> names  = RuntimeCaptureWriter.GetSavedConfigNames();
- 
-// Delete
-RuntimeCaptureWriter.Delete("MyPose");
-```
- 
-**`MaxSavedConfigs`** — optional static field. When set above `0`, the oldest JSON files are deleted automatically once the saved count exceeds the limit. Defaults to `0` (no limit).
- 
-```csharp
-RuntimeCaptureWriter.MaxSavedConfigs = 20; // keep only the 20 most recent
-```
- 
-> In the Editor, JSON files survive Play Mode exit, making them useful for iterating on runtime-captured poses between sessions.
 
 ## Data Storage
 
@@ -663,7 +416,7 @@ These files are plain Unity assets — safe to commit to version control and wil
 
 **I deleted an object but the config still references it.**
 
-Configs retain transforms for deleted objects so they can be restored if the user performs an Undo operation. To permanently remove these orphaned transforms, use **Remove Orphaned Transforms** on the config card context menu, or Clean Orphaned Transforms (All Configs) from the Options menu.
+Configs retain transforms for deleted objects so they can be restored if you perform an Undo operation. To permanently remove these orphaned transforms, use **Remove Orphaned Transforms** on the config card context menu, or **Clean Orphaned Transforms (All Configs)** from the Options menu.
 
 
 **Can I share configs between team members?**
@@ -671,20 +424,9 @@ Configs retain transforms for deleted objects so they can be restored if the use
 Yes — commit the `Assets/TransformSnapshotTool/CaptureData/` folder to source control. All team members on the same project will see the same configs automatically.
 
 
-**Can I use the runtime classes in a build?**
-
-Yes — `RuntimeCaptureApplier`, `RuntimeCaptureWriter`, `RuntimeCapturer`, and `SimpleRuntimeApplier` have no UnityEditor dependencies and are fully safe in builds. Only the editor window and editor-side scripts are Editor-only.
-
-
-**What is the difference between SimpleRuntimeApplier and RuntimeCapturer?**
-
-`SimpleRuntimeApplier` applies configs created in the editor tool. `RuntimeCapturer` captures and restores transforms created at runtime during gameplay. They use separate storage and cannot conflict with each other.
-
-
 **The import or paste dialog shows all rows unresolved.**
 
-The object names in the source config do not match those in the current scene. Use the ObjectField on each active row to drag the correct object from the Hierarchy, or use **Map All** button in paste mode if the two configs have the same structure but different names.
-
+The object names in the source config do not match those in the current scene. Use the ObjectField on each active row to drag the correct object from the Hierarchy, or use **Map All by Order** in paste mode if the two configs have the same structure but different names.
 
 
 **Can I apply only part of a config?**
@@ -692,4 +434,6 @@ The object names in the source config do not match those in the current scene. U
 Yes — use **Selected Only** mode to apply only the objects currently selected in the Hierarchy that also appear in the config. You can also toggle Position, Rotation, and Scale independently to apply partial transforms.
 
 
- 
+**Does this run in my game / add anything to my build?**
+
+No. Transform Snapshot Tool is a design-time Editor tool. It runs in the Editor (Edit Mode and Play Mode preview), never adds components to your objects, and is not compiled into a player build.
